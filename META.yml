@@ -14,5 +14,6 @@ meta-spec:
 name: Package-Pkg
 recommends: {}
 requires:
+  Class::MOP: 0
   Sub::Install: 0
-version: 0.0010
+version: 0.0011

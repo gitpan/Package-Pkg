@@ -1,6 +1,6 @@
 package Package::Pkg;
 BEGIN {
-  $Package::Pkg::VERSION = '0.0010';
+  $Package::Pkg::VERSION = '0.0011';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -153,7 +153,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0010
+version 0.0011
 
 =head1 SYNOPSIS
 
