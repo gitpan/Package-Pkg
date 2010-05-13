@@ -1,6 +1,6 @@
 package Package::Pkg;
 BEGIN {
-  $Package::Pkg::VERSION = '0.0011';
+  $Package::Pkg::VERSION = '0.0012';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -10,6 +10,22 @@ use warnings;
 
 require Class::MOP;
 require Sub::Install;
+
+our $pkg = __PACKAGE__;
+sub pkg { $pkg }
+__PACKAGE__->export( pkg => \&pkg );
+
+sub package {
+    my $self = shift;
+    my $package = join '::', @_;
+    $package =~ s/:{2,}/::/g;
+    return '' if $package eq '::';
+    if ( $package =~ m/^::/ ) {
+        my $caller = caller;
+        $package = "$caller$package";
+    }
+    return $package;
+}
 
 # pkg->install( name => sub { ... } => 
 sub install {
@@ -74,12 +90,6 @@ sub split2 {
     return( join( '::', @split ), $name );
 }
 
-our $pkg = __PACKAGE__;
-
-sub pkg { $pkg }
-
-__PACKAGE__->export( pkg => \&pkg );
-
 sub load {
     my $self = shift;
     my ( $package ) = @_;
@@ -112,7 +122,8 @@ sub exporter {
         my $name = $_;
 
         push @install, $name;
-        if ( ref $_[0] eq 'CODE' ) { push @install, shift }
+        if      ( ref $_[0] eq 'CODE' ) { push @install, shift }
+        elsif   ( $_[0] =~ s/^<// )     { push @install, shift }
 
         push @{ $group{$group} ||= [] }, $name;
         $index{$name} = \@install;
@@ -135,7 +146,9 @@ sub exporter {
 
         for my $name ( @exporting ) {
             my $install = $index{$name} or die "Unrecognized export ($name)";
-            __PACKAGE__->install( as => $install->[0], code => $install->[1], into => $package );
+            my $as = $install->[0];
+            my $code = $install->[1] || "${class}::$as";
+            __PACKAGE__->install( as => $as, code => $code, into => $package );
         }
     };
 
@@ -153,7 +166,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0011
+version 0.0012
 
 =head1 SYNOPSIS
 
@@ -197,9 +210,28 @@ Package::Pkg is a collection of useful, miscellaneous package-munging utilities.
 
 Install a subroutine, similar to L<Sub::Install> (and actually using that module to do the dirty work)
 
+=head2 $package = package( <part>, [ <part>, ..., <part> ] )
+
+Return a namespace composed by joining each <part> with C<::>
+
+Superfluous/redundant C<::> are automatically cleaned up and stripped from the resulting $package
+
+If the first part leads with a C<::>, the the calling package will be prepended to $package
+
+    pkg->package( 'Xyzzy', 'Apple::', '::Banana' ) # 'Xyzzy::Apple::Banana' 
+
+    pkg->package( 'Xyzzy', 'Apple::' ) # 'Xyzzy::Apple::
+    
+    package Cherry;
+    pkg->package( '::', 'Apple::', '::Banana' ) # 'Cherry::Apple::Banana'
+
+    pkg->package( '::Xyzzy::A::B' ) # 'Cherry::Xyzzy::A::B'
+
 =head2 export( ... )
 
 Setup an importer in the calling package
+
+Under construction
 
 =head1 SEE ALSO
 
