@@ -23,7 +23,7 @@ my %WriteMakefileArgs = (
                                            },
                        'ABSTRACT' => 'Handy package munging utilities',
                        'EXE_FILES' => [],
-                       'VERSION' => '0.0014',
+                       'VERSION' => '0.0015',
                        'PREREQ_PM' => {
                                         'Class::MOP' => '0',
                                         'Sub::Install' => '0'

@@ -1,6 +1,6 @@
 package Package::Pkg;
 BEGIN {
-  $Package::Pkg::VERSION = '0.0014';
+  $Package::Pkg::VERSION = '0.0015';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -177,8 +177,10 @@ sub exporter {
 
         push @install, $name;
         if ( @_ ) {
-            if      ( ref $_[0] eq 'CODE' ) { push @install, shift }
-            elsif   ( $_[0] =~ s/^<// )     { push @install, shift }
+            my $value = shift;
+            if      ( ref $value eq 'CODE' ) { push @install, $value }
+            elsif   ( $value =~ s/^<// )     { push @install, $value }
+            else                             { unshift @_, $value }
         }
 
         push @{ $group{$group} ||= [] }, $name;
@@ -222,7 +224,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0014
+version 0.0015
 
 =head1 SYNOPSIS
 
@@ -280,20 +282,20 @@ Superfluous/redundant C<::> are automatically cleaned up and stripped from the r
 
 If the first part leads with a C<::>, the the calling package will be prepended to $package
 
-    pkg->package( 'Xy', 'A::', '::B' )      # Xy::A::B
-    pkg->package( 'Xy', 'A::' )             # Xy::A::
+    pkg->name( 'Xy', 'A::', '::B' )      # Xy::A::B
+    pkg->name( 'Xy', 'A::' )             # Xy::A::
     
     {
         package Zy;
 
-        pkg->package( '::', 'A::', '::B' )  # Zy::A::B
-        pkg->package( '::Xy::A::B' )        # Zy::Xy::A::B
+        pkg->name( '::', 'A::', '::B' )  # Zy::A::B
+        pkg->name( '::Xy::A::B' )        # Zy::Xy::A::B
     }
 
-In addition, if any part is blessed, C<package> will resolve that part to the package that the part makes reference to:
+In addition, if any part is blessed, C<name> will resolve that part to the package that the part makes reference to:
 
     my $object = bless {}, 'Xyzzy';
-    pkg->package( $object, qw/ Cfg / );     # Xyzzy::Cfg
+    pkg->name( $object, qw/ Cfg / );     # Xyzzy::Cfg
 
 =head1 SEE ALSO
 
