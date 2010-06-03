@@ -16,4 +16,4 @@ recommends: {}
 requires:
   Class::MOP: 0
   Sub::Install: 0
-version: 0.0013
+version: 0.0014

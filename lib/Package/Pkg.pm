@@ -1,6 +1,6 @@
 package Package::Pkg;
 BEGIN {
-  $Package::Pkg::VERSION = '0.0013';
+  $Package::Pkg::VERSION = '0.0014';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -10,12 +10,19 @@ use warnings;
 
 require Class::MOP;
 require Sub::Install;
+use Try::Tiny;
+use Carp;
 
 our $pkg = __PACKAGE__;
 sub pkg { $pkg }
 __PACKAGE__->export( pkg => \&pkg );
 
-sub package {
+{
+    no warnings 'once';
+    *package = \&name;
+}
+
+sub name {
     my $self = shift;
     my $package = join '::', map { ref $_ ? ref $_ : $_ } @_;
     $package =~ s/:{2,}/::/g;
@@ -27,6 +34,56 @@ sub package {
     return $package;
 }
 
+sub load_name {
+    my $self = shift;
+    my $package = $self->name( @_ );
+    $self->load( $package );
+    return $package;
+}
+
+sub _is_package_loaded ($) { return Class::MOP::is_class_loaded( $_[0] ) }
+
+sub _package2pm ($) {
+    my $package = shift;
+    my $pm = $package . '.pm';
+    $pm =~ s{::}{/}g;
+    return $pm;
+}
+
+sub loader {
+    my $self = shift;
+    require Package::Pkg::Loader;
+    my $namespacelist = ref $_[0] eq 'ARRAY' ? shift : [ splice @_, 0, @_ ];
+    Package::Pkg::Loader->new( namespacelist => $namespacelist, @_ );
+}
+
+sub load {
+    my $self = shift;
+    my $package = @_ > 1 ? $self->name( @_ ) : $_[0];
+    return Class::MOP::load_class( $package );
+}
+
+sub softload {
+    my $self = shift;
+    my $package = @_ > 1 ? $self->name( @_ ) : $_[0];
+    
+    return $package if _is_package_loaded( $package );
+
+    my $pm = _package2pm $package;
+
+    return $package if try {
+        local $SIG{__DIE__};
+        require $pm;
+        return 1;
+    }
+    catch {
+        unless (/^Can't locate \Q$pm\E in \@INC/) {
+            confess "Couldn't load package ($package) because: $_";
+        }
+        return;
+    };
+}
+
 # pkg->install( name => sub { ... } => 
 sub install {
     my $self = shift;
@@ -36,7 +93,7 @@ sub install {
     elsif   ( @_ == 3 ) { @install{qw/ code into as /} = @_ }
     else                { %install = @_ }
 
-    my ( $from, $code, $into, $as ) = @install{qw/ from code into as /};
+    my ( $from, $code, $into, $_into, $as, ) = @install{qw/ from code into _into as /};
     undef %install;
 
     die "Missing code" unless defined $code;
@@ -62,6 +119,9 @@ sub install {
         else {
             ( $into, $as ) = $self->split2( $into );
         }
+    }
+    elsif ( defined $_into && ! defined $into ) {
+        $into = $_into;
     }
 
     if      ( defined $as ) {}
@@ -90,12 +150,6 @@ sub split2 {
     return( join( '::', @split ), $name );
 }
 
-sub load {
-    my $self = shift;
-    my ( $package ) = @_;
-    return Class::MOP::load_class( $package );
-}
-
 sub export {
     my $self = shift;
     my $exporter = $self->exporter( @_ );
@@ -122,8 +176,10 @@ sub exporter {
         my $name = $_;
 
         push @install, $name;
-        if      ( ref $_[0] eq 'CODE' ) { push @install, shift }
-        elsif   ( $_[0] =~ s/^<// )     { push @install, shift }
+        if ( @_ ) {
+            if      ( ref $_[0] eq 'CODE' ) { push @install, shift }
+            elsif   ( $_[0] =~ s/^<// )     { push @install, shift }
+        }
 
         push @{ $group{$group} ||= [] }, $name;
         $index{$name} = \@install;
@@ -166,7 +222,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0013
+version 0.0014
 
 =head1 SYNOPSIS
 
@@ -176,8 +232,8 @@ First, import a new keyword: C<pkg>
 
 Package name formation:
 
-    pkg->package( 'Xy', 'A' ) # Xy::A
-    pkg->package( $object, qw/ Cfg / ); # (ref $object)::Cfg
+    pkg->name( 'Xy', 'A' ) # Xy::A
+    pkg->name( $object, qw/ Cfg / ); # (ref $object)::Cfg
 
 Subroutine installation:
 
@@ -212,11 +268,11 @@ Package::Pkg is a collection of useful, miscellaneous package-munging utilities.
 
 =head1 USAGE
 
-=head2 install
+=head2 pkg->install( ... )
 
 Install a subroutine, similar to L<Sub::Install> (and actually using that module to do the dirty work)
 
-=head2 $package = package( <part>, [ <part>, ..., <part> ] )
+=head2 $package = pkg->name( <part>, [ <part>, ..., <part> ] )
 
 Return a namespace composed by joining each <part> with C<::>
 
@@ -238,12 +294,6 @@ In addition, if any part is blessed, C<package> will resolve that part to the pa
 
     my $object = bless {}, 'Xyzzy';
     pkg->package( $object, qw/ Cfg / );     # Xyzzy::Cfg
-
-=head2 export( ... )
-
-Setup an importer in the calling package
-
-Under construction
 
 =head1 SEE ALSO
 
