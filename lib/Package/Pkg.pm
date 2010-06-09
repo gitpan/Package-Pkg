@@ -1,6 +1,6 @@
 package Package::Pkg;
 BEGIN {
-  $Package::Pkg::VERSION = '0.0016';
+  $Package::Pkg::VERSION = '0.0016_1';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -89,7 +89,10 @@ sub install {
     my $self = shift;
     my %install;
     if      ( @_ == 1 ) { %install = %{ $_[0] } }
-    elsif   ( @_ == 2 ) { @install{qw/ code into /} = @_ }
+    elsif   ( @_ == 2 ) {
+        if ( $_[1] && $_[1] =~ m/::$/ ) { @install{qw/ code into /} = @_ }
+        else                            { @install{qw/ code as /} = @_ }
+    }
     elsif   ( @_ == 3 ) { @install{qw/ code into as /} = @_ }
     else                { %install = @_ }
 
@@ -104,23 +107,21 @@ sub install {
     else {
         if ( defined $from )
             { die "Invalid code ($code) with from ($from)" if $code =~ m/::/ }
-        elsif ( $code =~ m/::/)
-            { ( $from, $code ) = $self->split2( $code ) }
-        else                    
-            { $from = caller }
+        elsif ( $code =~ m/::/) {
+            $code =~ s/^<//; # Silently allow <Package::subroutine
+            ( $from, $code ) = $self->split2( $code );
+        }
+        else { $from = caller }
     }
 
     if ( defined $as && $as =~ m/::/) {
         die "Invalid as ($as) with into ($into)" if defined $into;
         ( $into, $as ) = $self->split2( $as );
     }
-    elsif ( defined $into && ! defined $as ) {
+    elsif ( defined $into ) {
         if ( $into =~ s/::$// ) { }
-        else {
-            ( $into, $as ) = $self->split2( $into );
-        }
     }
-    elsif ( defined $_into && ! defined $into ) {
+    elsif ( defined $_into ) {
         $into = $_into;
     }
 
@@ -128,7 +129,7 @@ sub install {
     elsif   ( ! ref $code ) { $as = $code }
     else                    { die "Missing as" }
 
-    die "Missing into" unless defined $into;
+    die "Missing into (@_)" unless defined $into;
 
     @install{qw/ code into as /} = ( $code, $into, $as );
     $install{from} = $from if defined $from;
@@ -145,7 +146,7 @@ sub split {
 sub split2 {
     my $self = shift;
     return unless my @split = $self->split( @_ );
-    return join '::', @split if 1 == @split;
+    return $split[0] if 1 == @split;
     my $name = pop @split;
     return( join( '::', @split ), $name );
 }
@@ -155,7 +156,7 @@ sub export {
     my $exporter = $self->exporter( @_ );
 
     my $package = caller;
-    $self->install( code => $exporter, into => "${package}::import" );
+    $self->install( code => $exporter, as => "${package}::import" );
 }
 
 sub exporter {
@@ -163,6 +164,7 @@ sub exporter {
     my ( %index, %group, $default_export );
     %group = ( default => [], optional => [], all => [] );
     $default_export = 1;
+
     while ( @_ ) {
         local $_ = shift;
         my ( $group, @install );
@@ -224,7 +226,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0016
+version 0.0016_1
 
 =head1 SYNOPSIS
 
@@ -272,7 +274,137 @@ Package::Pkg is a collection of useful, miscellaneous package-munging utilities.
 
 =head2 pkg->install( ... )
 
-Install a subroutine, similar to L<Sub::Install> (and actually using that module to do the dirty work)
+Install a subroutine, similar to L<Sub::Install>
+
+This method takes a number of parameters and also has a two- and three-argument form (see below)
+
+... parameters can be:
+
+    code    A subroutine reference, package/name identifier, or name
+            of a subroutine in the calling package
+
+    from    Optional. If 'code' is a simple name, then 'from' is the
+            source package. If not given, then 'from' is the same as
+            the calling package. If 'code' is a package/name, then
+            this parameter is ignored
+
+    into    A package identifier. If 'as' is given, then the full
+            name of the installed subroutine is <into>::<as>
+
+            If 'as' is not given and we can derive a simple name from
+            'code' (It is a package/name), then 'as' will take on the name
+            from 'code'
+            
+    as      The name of the subroutine to install as. Can be a simple name
+            (when paired with 'into') or a full package/name 
+
+For example:
+
+    # Install an anonymous subroutine as Banana::magic
+    pkg->install( code => sub { ... } , as => 'Banana::magic' )
+    pkg->install( code => sub { ... } , into => 'Banana::magic' ) # Bzzzt! Throws an error!
+
+    # Install the subroutine Apple::xyzzy as Banana::magic
+    pkg->install( code => 'Apple::xyzzy', as => 'Banana::magic' )
+    pkg->install( code => 'Apple::xyzzy', into => 'Banana', as => 'magic' )
+    pkg->install( from => 'Apple', code => 'xyzzy', as => 'Banana::magic' )
+    pkg->install( from => 'Apple', code => 'xyzzy', into => 'Banana', as => 'magic' )
+
+    # Install the subroutine Apple::xyzzy as Banana::xyzzy
+    pkg->install( code => 'Apple::xyzzy', as => 'Banana::xyzzy' )
+    pkg->install( code => 'Apple::xyzzy', into => 'Banana' )
+    pkg->install( from => 'Apple', code => 'xyzzy', as => 'Banana::xyzzy' )
+    pkg->install( from => 'Apple', code => 'xyzzy', into => 'Banana' )
+
+An example of implicit C<from>:
+
+    package Apple;
+
+    sub xyzzy { ... }
+
+    # Install the subroutine Apple::xyzzy as Banana::xyzzy
+    pkg->install( code => 'xyzzy', as => 'Banana::xyzzy' ) # 'from' is implicitly 'Apple'
+    pkg->install( code => \&xyzzy, as => 'Banana::xyzzy' )
+
+=head2 pkg->install( <code> => <as> )
+
+This is the two-argument form of subroutine installation
+
+Install <code> subroutine as <as>
+
+<code> should be:
+
+=over
+
+=item A CODE reference
+
+    sub { ... }
+
+=item A package/name identifier
+
+    Scalar::Util::blessed
+
+=item The name of a subroutine in the calling package
+
+    sub xyzzy { ... }
+
+    pkg->install( 'xyzzy' => ... )
+
+=back
+
+<as> should be:
+
+=over
+
+=item A package identifier (with a trailing ::)
+
+    Acme::Xyzzy::
+
+=item A package/name identifier
+
+    Acme::Xyzzy::magic
+
+=back
+
+    pkg->install( sub { ... } => 'Banana::xyzzy' )
+    pkg->install( 'Scalar::Util::blessed' => 'Banana::xyzzy' )
+    pkg->install( 'Scalar::Util::blessed' => 'Banana::' )
+    pkg->install( sub { ... } => 'Banana::' ) # Bzzzt! Throws an error!
+
+=head2 pkg->install( <code> => <into>, <as> )
+
+This is the three-argument form of subroutine installation
+
+<code> can be the same as the two argument form
+
+<into> should be:
+
+=over
+
+=item A package identifier (trailing :: is optional)
+
+    Acme::Xyzzy::
+
+    Acme::Xyzzy
+
+=back
+
+<as> should be:
+
+=over
+
+=item A name (the name of the subroutine)
+
+    xyzzy
+
+    magic
+
+=back
+
+    pkg->install( sub { ... } => 'Banana', 'xyzzy' )
+    pkg->install( sub { ... } => 'Banana::', 'xyzzy' )
+    pkg->install( 'Scalar::Util::blessed' => 'Banana', 'xyzzy' )
+    pkg->install( 'Scalar::Util::blessed' => 'Banana::', 'xyzzy' )
 
 =head2 $package = pkg->name( <part>, [ <part>, ..., <part> ] )
 
