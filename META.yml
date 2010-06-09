@@ -17,4 +17,4 @@ requires:
   Mouse: 0
   Sub::Install: 0
   Try::Tiny: 0
-version: 0.0016_1
+version: 0.0016_2
