@@ -1,6 +1,6 @@
 package Package::Pkg;
 BEGIN {
-  $Package::Pkg::VERSION = '0.0017';
+  $Package::Pkg::VERSION = '0.0018';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -48,6 +48,14 @@ sub _package2pm ($) {
     my $pm = $package . '.pm';
     $pm =~ s{::}{/}g;
     return $pm;
+}
+
+sub lexicon {
+    my $self = shift;
+    require Package::Pkg::Lexicon;
+    my $lexicon = Package::Pkg::Lexicon->new;
+    $lexicon->add( @_ ) if @_;
+    return $lexicon;
 }
 
 sub loader {
@@ -226,7 +234,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0017
+version 0.0018
 
 =head1 SYNOPSIS
 
