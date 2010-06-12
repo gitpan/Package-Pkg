@@ -14,7 +14,8 @@ meta-spec:
 name: Package-Pkg
 recommends: {}
 requires:
+  Clone: 0
   Mouse: 0
   Sub::Install: 0
   Try::Tiny: 0
-version: 0.0018
+version: 0.0019
