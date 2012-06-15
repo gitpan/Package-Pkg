@@ -1,6 +1,6 @@
 package Package::Pkg;
-BEGIN {
-  $Package::Pkg::VERSION = '0.0019';
+{
+  $Package::Pkg::VERSION = '0.0020';
 }
 # ABSTRACT: Handy package munging utilities
 
@@ -8,7 +8,7 @@ BEGIN {
 use strict;
 use warnings;
 
-require Mouse::Util;
+use Class::Load ':all';
 require Sub::Install;
 use Try::Tiny;
 use Carp;
@@ -41,7 +41,7 @@ sub load_name {
     return $package;
 }
 
-sub _is_package_loaded ($) { return Mouse::Util::is_class_loaded( $_[0] ) }
+sub _is_package_loaded ($) { return is_class_loaded( $_[0] ) }
 
 sub _package2pm ($) {
     my $package = shift;
@@ -234,7 +234,7 @@ Package::Pkg - Handy package munging utilities
 
 =head1 VERSION
 
-version 0.0019
+version 0.0020
 
 =head1 SYNOPSIS
 
@@ -452,11 +452,11 @@ L<Sub::Exporter>
 
 =head1 AUTHOR
 
-  Robert Krimen <robertkrimen@gmail.com>
+Robert Krimen <robertkrimen@gmail.com>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2010 by Robert Krimen.
+This software is copyright (c) 2012 by Robert Krimen.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
